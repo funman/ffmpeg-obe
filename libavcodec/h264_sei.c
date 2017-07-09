@@ -43,9 +43,7 @@ void ff_h264_reset_sei(H264Context *h)
     h->sei_frame_packing_present    =  0;
     h->sei_display_orientation_present = 0;
     h->sei_reguserdata_afd_present  =  0;
-    if (h->a53_caption)
-        av_freep(&h->a53_caption);
-    h->a53_caption_size = 0;
+    av_buffer_unref(&h->a53_caption);
 }
 
 static int decode_picture_timing(H264Context *h)
@@ -167,19 +165,21 @@ FF_ENABLE_DEPRECATION_WARNINGS
                     size -= 2;
                     if (cc_count && size >= cc_count*3) {
                         int i;
-                        uint8_t *tmp;
-                        if ((int64_t)h->a53_caption_size + (int64_t)cc_count*3 > INT_MAX)
+                        int ret;
+                        int old_size = h->a53_caption ? h->a53_caption->size : 0;
+                        if ((int64_t)old_size + (int64_t)cc_count*3 > INT_MAX)
                             return AVERROR(EINVAL);
 
                         // Allow merging of the cc data from two fields
-                        tmp = av_realloc(h->a53_caption, h->a53_caption_size + cc_count*3);
-                        if (!tmp)
-                            return AVERROR(ENOMEM);
-                        h->a53_caption = tmp;
+                        ret = av_buffer_realloc(&h->a53_caption, old_size + cc_count*3);
+                        if (ret < 0)
+                            return ret;
+
+                        /* Use of av_buffer_realloc assumes buffer is writeable */
                         for (i = 0; i < cc_count; i++) {
-                            h->a53_caption[h->a53_caption_size++] = get_bits(&h->gb, 8);
-                            h->a53_caption[h->a53_caption_size++] = get_bits(&h->gb, 8);
-                            h->a53_caption[h->a53_caption_size++] = get_bits(&h->gb, 8);
+                            h->a53_caption->data[old_size++] = get_bits(&h->gb, 8);
+                            h->a53_caption->data[old_size++] = get_bits(&h->gb, 8);
+                            h->a53_caption->data[old_size++] = get_bits(&h->gb, 8);
                         }
 
                         skip_bits(&h->gb, 8);

@@ -551,6 +551,12 @@ int ff_h264_update_thread_context(AVCodecContext *dst,
                        MAX_DELAYED_PIC_COUNT + 2, h, h1);
 
     h->frame_recovered       = h1->frame_recovered;
+    if (h1->a53_caption) {
+        h->a53_caption = av_buffer_ref(h1->a53_caption);
+        av_buffer_unref(&h1->a53_caption);
+    }
+    else
+        h->a53_caption = NULL;
 
     if (!h->cur_pic_ptr)
         return 0;

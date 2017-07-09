@@ -881,11 +881,10 @@ static void decode_postinit(H264Context *h, int setup_finished)
 
     if (h->a53_caption) {
         AVFrameSideData *sd =
-            av_frame_new_side_data(cur->f, AV_FRAME_DATA_A53_CC, h->a53_caption_size);
+            av_frame_new_side_data(cur->f, AV_FRAME_DATA_A53_CC, h->a53_caption->size);
         if (sd)
-            memcpy(sd->data, h->a53_caption, h->a53_caption_size);
-        av_freep(&h->a53_caption);
-        h->a53_caption_size = 0;
+            memcpy(sd->data, h->a53_caption->data, h->a53_caption->size);
+        av_buffer_unref(&h->a53_caption);
     }
 
     cur->mmco_reset = h->mmco_reset;
@@ -1392,9 +1391,10 @@ static int decode_nal_units(H264Context *h, const uint8_t *buf, int buf_size,
     h->max_contexts = h->slice_context_count;
     if (!(avctx->flags2 & CODEC_FLAG2_CHUNKS)) {
         h->current_slice = 0;
-        if (!h->first_field)
+        if (!h->first_field) {
             h->cur_pic_ptr = NULL;
-        ff_h264_reset_sei(h);
+            ff_h264_reset_sei(h);
+        }
     }
 
     if (h->nal_length_size == 4) {
